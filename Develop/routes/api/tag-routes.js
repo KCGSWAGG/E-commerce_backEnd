@@ -59,12 +59,70 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.put('/:id', (req, res) => {
-  // update a tag's name by its `id` value
+// Update tag's name by its `id` value
+router.put('/tags/:id', async (req, res) => {
+  try {
+    
+    await Tag.update(req.body, {
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (req.body.tagIds && req.body.tagIds.length > 0) {
+      const productTags = await ProductTag.findAll({
+        where: { product_id: req.params.id },
+      });
+
+      const existingProductTagIds = productTags.map(({ tag_id }) => tag_id);
+      const newProductTags = req.body.tagIds
+        .filter((tag_id) => !existingProductTagIds.includes(tag_id))
+        .map((tag_id) => ({
+          product_id: req.params.id,
+          tag_id,
+        }));
+
+      const productTagsToRemove = productTags
+        .filter(({ tag_id }) => !req.body.tagIds.includes(tag_id))
+        .map(({ id }) => id);
+
+      await Promise.all([
+        ProductTag.destroy({ where: { id: productTagsToRemove } }),
+        ProductTag.bulkCreate(newProductTags),
+      ]);
+    }
+
+    const updatedTag = await Tag.findByPk(req.params.id);
+    console.log('Tag updated:', updatedTag.id);
+    res.status(200).json(updatedTag);
+  } catch (err) {
+    console.error('Error while updating tag:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
-router.delete('/:id', (req, res) => {
-  // delete on tag by its `id` value
+
+router.delete('/tags/:id', async (req, res) => {
+  // Delete a tag by its `id` value
+  try {
+    const deleteTagData = await Tag.destroy({
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (deleteTagData === 0) {
+      res.status(404).json({ message: 'No tag found with id! cannot delete.' });
+      return;
+    }
+
+    console.log('Tag deleted:', req.params.id);
+    res.status(200).json(deleteTagData);
+  } catch (err) {
+    console.error('can not delete tag:', err);
+    res.status(500).json({ error: 'server error' });
+  }
 });
+
 
 module.exports = router;
