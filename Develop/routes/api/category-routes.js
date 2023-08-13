@@ -63,9 +63,47 @@ router.post('/categories', async (req, res) => {
 });
 
 
-router.put('/:id', (req, res) => {
-  // update a category by its `id` value
+router.put('/categories/:id', async (req, res) => {
+  // Update a category by its `id` value
+  try {
+    await Category.update(req.body, {
+      where: {
+        id: req.params.id,
+      },
+    });
+
+    if (req.body.productIds && req.body.productIds.length > 0) {
+      const products = await Product.findAll({
+        where: { category_id: req.params.id },
+      });
+
+      const existingProductIds = products.map(({ id }) => id);
+      const newProductCategories = req.body.productIds
+        .filter((product_id) => !existingProductIds.includes(product_id))
+        .map((product_id) => ({
+          category_id: req.params.id,
+          product_id,
+        }));
+
+      const productCategoriesToRemove = products
+        .filter(({ id }) => !req.body.productIds.includes(id))
+        .map(({ id }) => id);
+
+      await Promise.all([
+        ProductCategory.destroy({ where: { id: productCategoriesToRemove } }),
+        ProductCategory.bulkCreate(newProductCategories),
+      ]);
+    }
+
+    const updatedCategory = await Category.findByPk(req.params.id);
+    console.log('Category updated:', updatedCategory.id);
+    res.status(200).json(updatedCategory);
+  } catch (err) {
+    console.error('Error updating category:', err);
+    res.status(500).json({ error: 'server error' });
+  }
 });
+
 
 router.delete('/:id', (req, res) => {
   // delete a category by its `id` value
