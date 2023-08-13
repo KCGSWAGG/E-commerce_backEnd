@@ -38,8 +38,25 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', (req, res) => {
+router.post('/', async (req, res) => {
   // create a new tag
+  try {
+    const newTag = await Tag.create(req.body);
+
+    if (req.body.productIds && req.body.productIds.length > 0) {
+      const tagIdArr = req.body.productIds.map((product_id) => ({
+        tag_id: newTag.id,
+        product_id,
+      }));
+      await ProductTag.bulkCreate(tagIdArr);
+    }
+
+    console.log('New tag made:', newTag.id);
+    res.status(201).json(newTag);
+  } catch (err) {
+    console.error('Error while making tag:', err);
+    res.status(500).json({ error: 'server error' });
+  }
 });
 
 router.put('/:id', (req, res) => {
